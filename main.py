@@ -1,5 +1,6 @@
 import os
 import logging
+import json
 import requests as req
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
@@ -10,6 +11,7 @@ logging.basicConfig(level=logging.INFO)
 
 TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
+MAKE_WEBHOOK = "https://hook.eu1.make.com/bldhpbofq3tq4wzwplv8jr3c5s9j4tql"
 
 app = Flask(__name__)
 
@@ -58,7 +60,7 @@ MONEY COMMANDS:
 /pricingstrategy - Pricing strategy
 
 OUTREACH COMMANDS:
-/email - Cold outreach email
+/sendemail - Write AND send cold email automatically
 /followup - Follow up email
 /dmemail - DM script
 /linkedinmsg - LinkedIn message
@@ -210,12 +212,17 @@ async def pricingstrategy(update: Update, context: ContextTypes.DEFAULT_TYPE):
     result = await generate(prompt)
     await update.message.reply_text(f"💲 Pricing Strategy:\n\n{result}")
 
-async def email(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("⏳ Writing outreach email...")
+async def sendemail(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("⏳ Writing and sending email automatically...")
     niche = " ".join(context.args) if context.args else "small business owners"
-    prompt = f"Write a cold outreach email to {niche} offering AI content writing services. Short, friendly, specific pain point, clear offer, simple CTA. Max 150 words. Include subject line."
+    prompt = f"Write a cold outreach email to {niche} offering AI content writing services. Return ONLY a raw JSON object with exactly these 3 keys: to, subject, body. No explanation, no markdown, just the JSON."
     result = await generate(prompt)
-    await update.message.reply_text(f"📧 Outreach Email:\n\n{result}")
+    try:
+        data = json.loads(result)
+        req.post(MAKE_WEBHOOK, json=data)
+        await update.message.reply_text(f"✅ Email SENT automatically!\n\nTo: {data['to']}\nSubject: {data['subject']}\n\nBody preview:\n{data['body'][:200]}...")
+    except:
+        await update.message.reply_text(f"📧 Email drafted (send manually):\n\n{result}")
 
 async def followup(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("⏳ Writing follow up...")
@@ -268,13 +275,14 @@ async def report(update: Update, context: ContextTypes.DEFAULT_TYPE):
 /adcopy - Run 1 ad
 
 📧 OUTREACH TASKS:
-/email - Send 10 cold emails
+/sendemail - Auto send 10 cold emails
 /followup - Follow up yesterday leads
 /dmemail - DM 10 people
 /linkedinmsg - Connect with 20 people
 /proposal - Send to warm leads
 
-🔥 FOCUS: Send 10 emails using /email
+🔥 FOCUS: Type /sendemail restaurant owners
+Bot writes AND sends automatically!
 """)
 
 async def tasks(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -282,16 +290,16 @@ async def tasks(update: Update, context: ContextTypes.DEFAULT_TYPE):
 ✅ TODAY'S $100 TASKS
 
 MORNING:
-1. /coldsequence restaurant owners
-2. /email salon owners
-3. /linkedinmsg marketing managers
-4. Send to 10 prospects
+1. /sendemail restaurant owners
+2. /sendemail salon owners
+3. /sendemail gym owners
+4. /linkedinmsg marketing managers
 
 AFTERNOON:
 5. /tweet make money with AI
 6. /instagram money mindset
 7. /blog how AI helps small business
-8. Post everything
+8. Post everything manually
 
 EVENING:
 9. /followup
@@ -340,7 +348,7 @@ def main():
     application.add_handler(CommandHandler("pitch", pitch))
     application.add_handler(CommandHandler("productidea", productidea))
     application.add_handler(CommandHandler("pricingstrategy", pricingstrategy))
-    application.add_handler(CommandHandler("email", email))
+    application.add_handler(CommandHandler("sendemail", sendemail))
     application.add_handler(CommandHandler("followup", followup))
     application.add_handler(CommandHandler("dmemail", dmemail))
     application.add_handler(CommandHandler("linkedinmsg", linkedinmsg))
