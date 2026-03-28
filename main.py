@@ -10,7 +10,7 @@ from threading import Thread
 logging.basicConfig(level=logging.INFO)
 
 TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
+GROQ_API_KEY = os.environ.get("GEMINI_API_KEY")
 MAKE_WEBHOOK = "https://hook.eu1.make.com/bldhpbofq3tq4wzwplv8jr3c5s9j4tql"
 
 app = Flask(__name__)
@@ -24,10 +24,17 @@ def run_flask():
 
 async def generate(prompt):
     try:
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
-        data = {"contents":[{"parts":[{"text":prompt}]}]}
-        r = req.post(url, json=data)
-        return r.json()["candidates"][0]["content"]["parts"][0]["text"][:4000]
+        url = "https://api.groq.com/openai/v1/chat/completions"
+        headers = {
+            "Authorization": f"Bearer {GROQ_API_KEY}",
+            "Content-Type": "application/json"
+        }
+        data = {
+            "model": "llama3-8b-8192",
+            "messages": [{"role": "user", "content": prompt}]
+        }
+        r = req.post(url, headers=headers, json=data)
+        return r.json()["choices"][0]["message"]["content"][:4000]
     except Exception as e:
         return f"Error: {str(e)}"
 
@@ -222,7 +229,7 @@ async def sendemail(update: Update, context: ContextTypes.DEFAULT_TYPE):
         req.post(MAKE_WEBHOOK, json=data)
         await update.message.reply_text(f"✅ Email SENT automatically!\n\nTo: {data['to']}\nSubject: {data['subject']}\n\nBody preview:\n{data['body'][:200]}...")
     except:
-        await update.message.reply_text(f"📧 Email drafted (send manually):\n\n{result}")
+        await update.message.reply_text(f"📧 Email drafted:\n\n{result}")
 
 async def followup(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("⏳ Writing follow up...")
@@ -282,7 +289,6 @@ async def report(update: Update, context: ContextTypes.DEFAULT_TYPE):
 /proposal - Send to warm leads
 
 🔥 FOCUS: Type /sendemail restaurant owners
-Bot writes AND sends automatically!
 """)
 
 async def tasks(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -299,7 +305,6 @@ AFTERNOON:
 5. /tweet make money with AI
 6. /instagram money mindset
 7. /blog how AI helps small business
-8. Post everything manually
 
 EVENING:
 9. /followup
@@ -326,7 +331,6 @@ def main():
     flask_thread.start()
 
     application = Application.builder().token(TELEGRAM_TOKEN).build()
-
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("youtube", youtube))
     application.add_handler(CommandHandler("tweet", tweet))
@@ -357,7 +361,6 @@ def main():
     application.add_handler(CommandHandler("tasks", tasks))
     application.add_handler(CommandHandler("ask", ask))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-
     application.run_polling()
 
 if __name__ == "__main__":
